@@ -1,118 +1,197 @@
 # TestForge
 
-An interactive exam portal. Admins create topics, questions and exams;
-students take exams, get graded automatically, and can see their results and weak
-areas. Built as a college group project by 4 people.
+An online exam portal built as our PGCP-AC project at C-DAC.
 
-Java 17 · Spring Boot 3.3 · Spring Security (JWT) · PostgreSQL · Maven
+Admins create topics, add questions to a question bank and set up exams.
+Students log in, attempt an exam against a timer and get their result
+immediately. The system checks the answers itself, works out the percentage
+and pass/fail, and keeps every answer so it can also show which topics a
+student is weak in. Admins get a report of the topics the whole batch finds
+difficult, and reminder emails go out before each exam.
 
 ## What it does
 
-- Register / login with JWT tokens (roles: STUDENT and ADMIN)
-- Admin manages topics, a question bank, and exams
-- Students attempt exams and answers are graded automatically
-- Results are stored with a topic-wise breakdown so students see where they're weak
-- Analytics + a simple dashboard for admin and students
-- Automatic email reminders before an exam (scheduled job)
+- Registration and login with JWT tokens, passwords stored as BCrypt hashes
+- Two roles: STUDENT and ADMIN, with different screens and permissions
+- Topic and question bank management (four options, one correct answer)
+- Exam creation with duration, passing marks and schedule
+- Questions are mapped to exams, so the same question can be reused
+- Timer based exam attempt that auto-submits when the time is over
+- Automatic evaluation, one mark per question, instant result
+- Answer sheet review with a topic-wise breakdown
+- Weak topic detection per student, difficult topic report for the batch
+- Reminder emails, sent manually or automatically 24 hours before an exam
 
-## Tech stack
+## Built with
 
-- Java 17, Spring Boot 3.3
-- Spring Security with JWT for auth
-- Spring Data JPA / Hibernate
-- PostgreSQL
-- Maven (build)
-- Lombok (install it in your IDE or you'll see fake errors)
+Backend: Java 17, Spring Boot 3.3, Spring Security (JWT), Hibernate/JPA, Maven
+Frontend: React, Vite, Axios, React Router, Bootstrap
+Database: PostgreSQL
+Tools: Eclipse, VS Code, Postman, pgAdmin, Git
 
-## Getting started
+## Folder structure
 
-You need JDK 17+, PostgreSQL, Maven, and Lombok set up in your IDE.
+    TestForge/
+        backend/        Spring Boot project (open this one in Eclipse)
+        frontend/       React project (open this one in VS Code)
+        database/
+            TestForge_schema.sql        creates the 9 tables
+            TestForge_sample_data.sql   optional demo data
 
-1. Create a database named `testforge` in pgAdmin.
-2. Open the query tool and run `db/TestForge_schema.sql`. This creates all the tables.
-3. Copy the example config and fill in your own values:
+## Setting it up
 
-   ```
-   copy src\main\resources\application.properties.example src\main\resources\application.properties
-   ```
+You need JDK 17, PostgreSQL, Node.js 18 or above, Eclipse and VS Code.
 
-   Then edit `application.properties`:
-   - `spring.datasource.password` = your postgres password
-   - `app.jwt.secret` = a long random string (run `openssl rand -base64 32` to make one)
+### 1. Database
 
-4. Run the app. In Eclipse: right-click the project > Run As > Spring Boot App.
-   Or from a terminal: `mvn spring-boot:run`
-5. It starts on `http://localhost:8080`.
+Open pgAdmin and create a database called `testforge`. Open the Query Tool
+on it and run `database/TestForge_schema.sql`. You should end up with 9
+tables under Schemas > public > Tables.
 
-Note: `application.properties` is gitignored on purpose because it has your password
-and secret. Only the `.example` file is in the repo. Everyone makes their own local copy.
+If you want some data to work with, run `database/TestForge_sample_data.sql`
+as well. It adds 10 users, 10 topics, 30 questions, 10 exams and some past
+attempts. Every user in that file has the password `password123`.
 
-## First admin user
+### 2. Backend
 
-The API only creates STUDENT accounts. To get an admin, register a normal user,
-then flip the role in the database:
+Lombok has to be installed into Eclipse itself, otherwise the editor shows
+hundreds of errors that are not really there. Download `lombok.jar` from
+projectlombok.org, run it with `java -jar lombok.jar`, point it at your
+Eclipse folder, install, and restart Eclipse.
 
-```sql
-UPDATE users SET role = 'ADMIN' WHERE email = 'you@example.com';
-```
+Then import the project: File > Import > Maven > Existing Maven Projects,
+and select the `backend` folder.
 
-## API overview
+Create `backend/src/main/resources/application.properties` (it is not in
+Git because it holds passwords) using this as a starting point:
 
-Auth is a Bearer token. Log in, copy the `token` from the response, and send it as
-a header on protected calls: `Authorization: Bearer <token>`.
+    spring.datasource.url=jdbc:postgresql://localhost:5432/testforge
+    spring.datasource.username=postgres
+    spring.datasource.password=YOUR_DB_PASSWORD
 
-Public:
-- `POST /api/auth/register` - create a student account
-- `POST /api/auth/login` - get a token
+    spring.jpa.hibernate.ddl-auto=none
+    spring.jpa.show-sql=true
 
-Topics (read = any logged-in user, write = admin):
-- `GET /api/topics`
-- `POST /api/topics`, `PUT /api/topics/{id}`, `DELETE /api/topics/{id}`
+    app.jwt.secret=any-long-random-string-at-least-32-characters
+    app.jwt.expiration-ms=86400000
 
-Questions (admin only):
-- `GET /api/questions` (add `?topicId=3` to filter by topic)
-- `POST /api/questions`, `PUT /api/questions/{id}`, `DELETE /api/questions/{id}`
+    server.port=8080
 
-Exams:
-- `GET /api/exams` - list exams
-- `GET /api/exams/{id}/attempt` - questions for taking the exam (no answers shown)
-- admin: `GET /api/exams/all`, `POST /api/exams`, `PUT`, `DELETE`, `POST /api/exams/{id}/questions`
+    # only needed for the reminder emails
+    spring.mail.host=smtp.gmail.com
+    spring.mail.port=587
+    spring.mail.username=your.email@gmail.com
+    spring.mail.password=16_CHARACTER_APP_PASSWORD
+    spring.mail.properties.mail.smtp.auth=true
+    spring.mail.properties.mail.smtp.starttls.enable=true
 
-Results:
-- `POST /api/exams/{id}/submit` - submit answers, get graded
-- `GET /api/results/{studentId}` - a student's past results
-- `GET /api/results/detail/{resultId}` - full breakdown of one result
+For the mail password use a Gmail App Password, not your normal one.
+Turn on 2-Step Verification first, then create an App Password under
+Google Account > Security. If you skip the mail settings the app still
+runs, it just logs the emails as FAILED.
 
-Users (admin only):
-- `GET /api/users`, `GET /api/users/{id}`
+Now run it: right-click the project > Run As > Spring Boot App. The console
+should end with `Started TestForgeApplication` and the API is then on
+http://localhost:8080.
 
-Analytics & dashboard (admin only unless noted):
-- `GET /api/analytics/student/{id}`, `GET /api/analytics/difficult-topics`
-- `GET /api/dashboard/student/{id}`, `GET /api/dashboard/admin`
+### 3. Frontend
 
-Reminders (admin only):
-- `POST /api/reminders/send/{examId}`, `GET /api/reminders/logs`
+    cd frontend
+    npm install
+    npm run dev
 
-## Who built what
+Open http://localhost:5173. Start the backend before this, or every page
+will load but nothing will work.
 
-| Person | Area |
-|--------|------|
-| A | Project setup, config, security (JWT), auth, users, shared exception handling |
-| B | Topics, question bank, exams |
-| C | Exam attempts and grading (results, student answers) |
-| D | Analytics, reports, email notifications, dashboards |
+### 4. Make yourself an admin
 
-## Branches
+New accounts are always students. Register once through the app, then run
+this in pgAdmin:
 
-- `dev` - where everyone's work is merged and integrated
-- `test` - promoted from dev once things are stable
-- `final-production` - the release branch
+    UPDATE users SET role = 'ADMIN' WHERE email = 'your@email.com';
 
-Each person works on their own feature branch and opens a pull request into `dev`.
+Log out and log in again to pick up the new role.
 
-## Notes
+## Logins for the sample data
 
-- If you see lots of red errors right after importing, it's almost always Lombok
-  not installed in the IDE. Install it and restart.
-- If a call returns 401, you forgot the token. If it returns 403, your token is a
-  student but the endpoint needs an admin.
+    Admin      admin@testforge.com          password123
+    Student    rahul.sharma@student.com     password123
+
+## API endpoints
+
+Everything except the two auth endpoints needs the header
+`Authorization: Bearer <token>`.
+
+    POST   /api/auth/register
+    POST   /api/auth/login
+
+    GET    /api/users                        admin
+    GET    /api/users/{id}                   admin
+
+    GET    /api/topics
+    POST   /api/topics                       admin
+    PUT    /api/topics/{id}                  admin
+    DELETE /api/topics/{id}                  admin
+
+    GET    /api/questions                    admin
+    POST   /api/questions                    admin
+    PUT    /api/questions/{id}               admin
+    DELETE /api/questions/{id}               admin
+
+    GET    /api/exams                        exams a student can take
+    GET    /api/exams/all                    admin, includes drafts
+    GET    /api/exams/{id}/attempt           questions without the answers
+    POST   /api/exams                        admin
+    PUT    /api/exams/{id}                   admin
+    DELETE /api/exams/{id}                   admin
+    POST   /api/exams/{id}/questions         admin, map questions
+
+    POST   /api/exams/{id}/submit            submit and get graded
+    GET    /api/results/{studentId}
+    GET    /api/results/detail/{resultId}
+
+    GET    /api/analytics/student/{id}
+    GET    /api/analytics/difficult-topics   admin
+    GET    /api/dashboard/student/{id}
+    GET    /api/dashboard/admin              admin
+
+    POST   /api/reminders/send/{examId}      admin
+    GET    /api/reminders/logs               admin
+
+There is also a scheduled job in the backend that sends reminders on its
+own, roughly 24 hours before each exam.
+
+## Database tables
+
+    users                accounts, role and hashed password
+    topics               subject categories
+    questions            question bank, four options and the answer
+    exams                title, duration, passing marks, schedule
+    exam_questions       which questions belong to which exam
+    results              one row per exam attempt
+    student_answers      one row per question of an attempt
+    student_weaknesses   topic status per student
+    email_logs           record of every reminder email
+
+An exam only becomes visible to students once at least one question has been
+mapped to it, so a newly created exam stays a draft until you add questions.
+
+## If something does not work
+
+- Red CORS error in the browser console: the backend is not running.
+- Everything returns 401: the token expired, log in again.
+- 403 on an admin page: you are logged in as a student.
+- 500 error: read the stack trace in the Eclipse console, not the browser.
+- Eclipse shows errors on every entity: Lombok is not installed in Eclipse.
+- Timer or dashboard shows undefined: log out and log in again so the
+  session is stored freshly.
+
+## Team
+
+- Sayali Narvekar
+- Swati Dixit
+- Sukruti Dhole
+- Vinay Dharurkar
+
+Project guide: Mr. Abhilash Bande
+ACTS C-DAC, Pune 

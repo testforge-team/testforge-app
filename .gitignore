@@ -1,17 +1,17 @@
-# --- Frontend (React) ---
-**/node_modules/
-**/dist/
-.env.local
-.env
+# build output
+backend/target/
+*.class
+*.log
 
-# --- Backend (Spring Boot) ---
-**/target/
-**.class
-.mtj.tmp/
+# secrets - keep local only
+backend/src/main/resources/application.properties
 
-# --- IDEs & System Junk ---
-.idea/
-.vscode/
-.metadata/
-*.iml
-.DS_Store
+# Eclipse
+.project
+.classpath
+.settings/
+.factorypath
+
+# React
+frontend/node_modules/
+frontend/dist/
