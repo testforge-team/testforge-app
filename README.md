@@ -34,7 +34,7 @@ Tools: Eclipse, VS Code, Postman, pgAdmin, Git
     TestForge/
         backend/        Spring Boot project (open this one in Eclipse)
         frontend/       React project (open this one in VS Code)
-        database/
+        sample_data/
             TestForge_schema.sql        creates the 9 tables
             TestForge_sample_data.sql   optional demo data
 
