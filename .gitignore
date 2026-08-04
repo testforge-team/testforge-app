@@ -1,0 +1,17 @@
+# build output
+backend/target/
+*.class
+*.log
+
+# secrets - keep local only
+backend/src/main/resources/application.properties
+
+# Eclipse
+.project
+.classpath
+.settings/
+.factorypath
+
+# React
+frontend/node_modules/
+frontend/dist/
