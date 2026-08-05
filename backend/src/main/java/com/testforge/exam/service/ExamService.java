@@ -1,5 +1,6 @@
 package com.testforge.exam.service;
 
+import com.testforge.common.enums.ExamStatus;
 import com.testforge.exam.dto.ExamAttemptDto;
 import com.testforge.exam.dto.ExamDto;
 import com.testforge.exam.dto.ExamRequest;
@@ -31,10 +32,9 @@ public class ExamService {
     private final UserRepository userRepository;
     private final QuestionMapper questionMapper;
 
-    /**
-     * Create an exam. 'adminEmail' comes from the JWT (see the controller):
-     * we look the admin up and store them as created_by for accountability.
-     */
+    /** Default window if the admin does not choose one. */
+    private static final int DEFAULT_ACTIVE_HOURS = 24;
+
     @Transactional
     public ExamDto createExam(ExamRequest req, String adminEmail) {
         User admin = userRepository.findByEmail(adminEmail)
@@ -45,6 +45,9 @@ public class ExamService {
                 .durationMinutes(req.getDurationMinutes())
                 .passingMarks(req.getPassingMarks())
                 .scheduledAt(req.getScheduledAt())
+                // NEW: use the given window, or fall back to 24 hours
+                .activeHours(req.getActiveHours() == null
+                        ? DEFAULT_ACTIVE_HOURS : req.getActiveHours())
                 .createdBy(admin)
                 .build());
         return toDto(saved);
@@ -57,15 +60,15 @@ public class ExamService {
         exam.setDurationMinutes(req.getDurationMinutes());
         exam.setPassingMarks(req.getPassingMarks());
         exam.setScheduledAt(req.getScheduledAt());
+        if (req.getActiveHours() != null) {
+            exam.setActiveHours(req.getActiveHours());
+        }
         return toDto(examRepository.save(exam));
     }
 
     @Transactional
     public void deleteExam(Long id) {
         Exam exam = findOr404(id);
-        // exam_questions rows vanish automatically (ON DELETE CASCADE in the SQL),
-        // but results referencing the exam will block deletion — turn that
-        // into a readable message.
         try {
             examRepository.delete(exam);
             examRepository.flush();
@@ -74,70 +77,61 @@ public class ExamService {
         }
     }
 
-    /**
-     * Map questions into an exam (fills the junction table).
-     * We loop the ids; for each we verify the question exists, build the
-     * composite key, skip it if already mapped, otherwise insert one
-     * ExamQuestion row. Duplicates are skipped silently so the admin can
-     * resend the same list without errors.
-     */
     @Transactional
     public ExamDto addQuestionsToExam(Long examId, List<Long> questionIds) {
         Exam exam = findOr404(examId);
-
         for (Long qId : questionIds) {
             Question question = questionRepository.findById(qId)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Question not found with id: " + qId));
-
+                    .orElseThrow(() -> new ResourceNotFoundException("Question not found with id: " + qId));
             ExamQuestionId key = new ExamQuestionId(examId, qId);
             if (!examQuestionRepository.existsById(key)) {
                 examQuestionRepository.save(ExamQuestion.builder()
-                        .id(key)
-                        .exam(exam)
-                        .question(question)
-                        .build());
+                        .id(key).exam(exam).question(question).build());
             }
         }
         return toDto(exam);
     }
 
     /**
-     * Exams a student may take. "Published" in our design simply means
-     * the exam has at least one question mapped (the schema has no status
-     * column by decision). Empty exams stay invisible to students.
+     * Exams a student may see.
+     *
+     * WHAT CHANGED: we still hide exams with no questions (that is our
+     * publishing rule), but we now also hide ones whose window has CLOSED,
+     * because a student can no longer do anything with them. Upcoming exams
+     * are kept, so the student can see what is coming - the dashboard shows
+     * them with a "Starts at ..." badge and no Start button.
      */
     @Transactional(readOnly = true)
     public List<ExamDto> getExamsForStudents() {
         return examRepository.findAll().stream()
                 .map(this::toDto)
                 .filter(dto -> dto.getTotalQuestions() > 0)
+                .filter(dto -> !ExamStatus.EXPIRED.name().equals(dto.getStatus()))
                 .toList();
     }
 
-    /** Admin list: sees every exam, including empty drafts. */
+    /** Admin list: every exam, including drafts and closed ones. */
     @Transactional(readOnly = true)
     public List<ExamDto> getAllExamsForAdmin() {
         return examRepository.findAll().stream().map(this::toDto).toList();
     }
 
     /**
-     * THE ATTEMPT ENDPOINT'S DATA: exam settings + questions as
-     * QuestionStudentDto — the class that physically has no correctOption
-     * field, so the answer key cannot leak mid-exam.
+     * The questions for an attempt, WITHOUT the correct answers.
+     *
+     * NOTE: the exam screen now normally calls POST /exams/{id}/start instead,
+     * which also returns the timer and saved answers. This method is kept
+     * because it is still useful for a preview and does no harm.
      */
     @Transactional(readOnly = true)
     public ExamAttemptDto getExamForAttempt(Long examId) {
         Exam exam = findOr404(examId);
-
         List<Question> questions = examQuestionRepository.findByExam_ExamId(examId).stream()
                 .map(ExamQuestion::getQuestion)
                 .toList();
-
         if (questions.isEmpty()) {
             throw new BadRequestException("This exam has no questions yet.");
         }
-
         return ExamAttemptDto.builder()
                 .examId(exam.getExamId())
                 .title(exam.getTitle())
@@ -151,6 +145,10 @@ public class ExamService {
                 .orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + id));
     }
 
+    /**
+     * Entity to DTO. The three new values (activeHours, endsAt, status) are
+     * calculated here every time, so they can never be stale.
+     */
     private ExamDto toDto(Exam e) {
         return ExamDto.builder()
                 .examId(e.getExamId())
@@ -159,6 +157,9 @@ public class ExamService {
                 .passingMarks(e.getPassingMarks())
                 .scheduledAt(e.getScheduledAt())
                 .totalQuestions(examQuestionRepository.countByExam_ExamId(e.getExamId()))
+                .activeHours(e.getActiveHours())
+                .endsAt(e.getEndsAt())
+                .status(e.getStatus().name())
                 .build();
     }
 }

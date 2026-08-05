@@ -36,7 +36,9 @@ import java.io.Serializable;
 @EqualsAndHashCode
 public class ExamQuestionId implements Serializable {
 
-    @Column(name = "exam_id")
+    private static final long serialVersionUID = 1L;
+
+	@Column(name = "exam_id")
     private Long examId;
 
     @Column(name = "question_id")

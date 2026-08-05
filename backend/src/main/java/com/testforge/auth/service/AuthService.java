@@ -68,7 +68,7 @@ public class AuthService {
                 .token(token)
                 .role(user.getRole().name())
                 .name(user.getName())
-                .userId(user.getUserId())
+                .userId(user.getUserId())      
                 .build();
     }
 }

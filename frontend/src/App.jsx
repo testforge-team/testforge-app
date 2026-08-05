@@ -21,6 +21,18 @@ import Login from './auth/Login'
 import Register from './auth/Register'
 import ProtectedRoute from './auth/ProtectedRoute'
 import { getSession } from './auth/authService'
+import Topics from './admin/Topics'
+import Questions from './admin/Questions'
+import ManageExams from './admin/ManageExams'
+import StudentDashboard from './student/StudentDashboard'
+import ExamAttempt from './student/ExamAttempt'
+import Result from './student/Result'
+import ResultDetail from './student/ResultDetail'
+import History from './student/History'
+import Performance from './analytics/Performance'
+import AdminDashboard from './analytics/AdminDashboard'
+import Reminders from './analytics/Reminders'
+
 
 // >>> PERSON B: add your imports here (Topics, Questions, ManageExams)
 // >>> PERSON C: add your imports here (StudentDashboard, ExamAttempt, Result, ResultDetail, History)
@@ -37,14 +49,26 @@ export default function App() {
         <Route path="/register" element={<Register />} />
 
         {/* ---- Student area (login required) ---- */}
-        <Route path="/student" element={<ProtectedRoute><StudentHome /></ProtectedRoute>} />
+        <Route path="/student" element={<ProtectedRoute><StudentDashboard /></ProtectedRoute>} />
+        <Route path="/student/exam/:id" element={<ProtectedRoute><ExamAttempt /></ProtectedRoute>} />
+        <Route path="/student/result" element={<ProtectedRoute><Result /></ProtectedRoute>} />
+        <Route path="/student/result/:resultId" element={<ProtectedRoute><ResultDetail /></ProtectedRoute>} />
+        <Route path="/student/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+        <Route path="/student/performance" element={<ProtectedRoute><Performance /></ProtectedRoute>} />
+
         {/* >>> PERSON C: replace StudentHome above with your StudentDashboard,
             and add your routes here:
             /student/exam/:id  /student/result  /student/result/:resultId  /student/history */}
         {/* >>> PERSON D: add /student/performance here */}
 
         {/* ---- Admin area (login + ADMIN role required) ---- */}
-        <Route path="/admin" element={<ProtectedRoute adminOnly><AdminHome /></ProtectedRoute>} />
+        
+        <Route path="/admin/topics" element={<ProtectedRoute adminOnly><Topics /></ProtectedRoute>} />
+        <Route path="/admin/questions" element={<ProtectedRoute adminOnly><Questions /></ProtectedRoute>} />
+        <Route path="/admin/exams" element={<ProtectedRoute adminOnly><ManageExams /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/reminders" element={<ProtectedRoute adminOnly><Reminders /></ProtectedRoute>} />
+
         {/* >>> PERSON B: add /admin/topics  /admin/questions  /admin/exams here */}
         {/* >>> PERSON D: replace AdminHome with your AdminDashboard, add /admin/reminders */}
       </Routes>
@@ -55,30 +79,3 @@ export default function App() {
 // ---------- Temporary placeholder pages (Person A's test targets) ----------
 // These prove that login lands in the right place for each role.
 // They are replaced when C and D deliver their real dashboards.
-function StudentHome() {
-  const { name } = getSession()
-  return (
-    <div className="container">
-      <div className="card p-4">
-        <h4>Welcome, {name}! (Student)</h4>
-        <p className="text-muted mb-0">
-          Login works. Person C's dashboard and exam screens will appear here.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function AdminHome() {
-  const { name } = getSession()
-  return (
-    <div className="container">
-      <div className="card p-4">
-        <h4>Welcome, {name}! (Admin)</h4>
-        <p className="text-muted mb-0">
-          Admin login works. Person B's and D's admin screens will appear here.
-        </p>
-      </div>
-    </div>
-  )
-}

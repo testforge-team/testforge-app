@@ -16,6 +16,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+//v2
+import com.testforge.common.enums.AttemptStatus;
+
 /**
  * Read-only views built from data GradingService produced:
  * a student's history list, and the full detail of one attempt.
@@ -34,6 +37,11 @@ public class ResultService {
         List<ResultHistoryDto> out = new ArrayList<>();
 
         for (Result r : results) {
+            // NEW: skip attempts that are still being written
+            if (r.getStatus() == AttemptStatus.IN_PROGRESS) {
+                continue;
+            }
+
             List<StudentAnswer> answers = studentAnswerRepository.findByResult_ResultId(r.getResultId());
             int total = answers.size();
             int obtained = r.getFinalScore();
@@ -50,7 +58,9 @@ public class ResultService {
         return out;
     }
 
-    /** Full detail of one attempt: headline + per-question review + topic breakdown. */
+    /**
+     * Full detail of one attempt: headline + per-question review + topic breakdown.
+     */
     @Transactional(readOnly = true)
     public ResultDetailDto getDetail(Long resultId) {
         Result r = resultRepository.findById(resultId)
@@ -72,14 +82,14 @@ public class ResultService {
                     .questionText(q.getQuestionText())
                     .topicName(topicName)
                     .selectedOption(a.getSelectedOption())
-                    .correctOption(q.getCorrectOption())   // safe now: exam is over
+                    .correctOption(q.getCorrectOption()) // safe now: exam is over
                     .correct(Boolean.TRUE.equals(a.getIsCorrect()))
                     .build());
 
             int[] tally = byTopic.computeIfAbsent(topicName, k -> new int[2]);
-            tally[1]++;                                    // total for this topic
+            tally[1]++; // total for this topic
             if (Boolean.TRUE.equals(a.getIsCorrect())) {
-                tally[0]++;                                // correct for this topic
+                tally[0]++; // correct for this topic
             }
         }
 
@@ -111,7 +121,8 @@ public class ResultService {
 
     /** Safe percentage with 2 decimals; guards against divide-by-zero. */
     private double pct(int part, int whole) {
-        if (whole == 0) return 0.0;
+        if (whole == 0)
+            return 0.0;
         return Math.round((part * 100.0 / whole) * 100.0) / 100.0;
     }
 }

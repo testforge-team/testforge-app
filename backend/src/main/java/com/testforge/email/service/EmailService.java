@@ -20,8 +20,19 @@ import java.util.List;
 
 /**
  * Sends exam reminder emails and records every attempt in email_logs.
- * JavaMailSender is provided automatically by Spring because we added the
- * 'spring-boot-starter-mail' dependency and set spring.mail.* in properties.
+ *
+ * TWO ENTRY POINTS NOW:
+ *
+ *   broadcastReminder(examId)
+ *       The MANUAL path (admin presses the button). Sends to EVERY student,
+ *       no questions asked - the admin explicitly wants a (re)send.
+ *
+ *   broadcastReminderSkippingSent(examId)
+ *       The AUTOMATIC path (ExamReminderScheduler, every 15 min). Sends only
+ *       to students who do NOT yet have a SENT log row for this exam. So:
+ *         - a student already emailed successfully  -> skipped (no duplicate)
+ *         - a student whose last attempt FAILED     -> retried
+ *         - a student never attempted               -> sent
  */
 @Service
 @RequiredArgsConstructor
@@ -33,21 +44,14 @@ public class EmailService {
     private final ExamRepository examRepository;
 
     /**
-     * Broadcast a reminder for one exam to ALL registered students.
-     * (Our design decision: no per-exam enrollment table, so reminders go
-     * to every student.) Returns how many were sent successfully.
+     * MANUAL broadcast: send to ALL students unconditionally.
+     * Returns how many were sent successfully.
      */
     public int broadcastReminder(Long examId) {
-        Exam exam = examRepository.findById(examId)
-                .orElseThrow(() -> new ResourceNotFoundException("Exam not found with id: " + examId));
-
-        // Every STUDENT (admins don't take exams, so they're excluded).
-        List<User> students = userRepository.findAll().stream()
-                .filter(u -> u.getRole() == Role.STUDENT)
-                .toList();
+        Exam exam = getExam(examId);
 
         int sentCount = 0;
-        for (User student : students) {
+        for (User student : allStudents()) {
             if (sendOne(student, exam)) {
                 sentCount++;
             }
@@ -56,9 +60,51 @@ public class EmailService {
     }
 
     /**
+     * AUTOMATIC broadcast: send only to students without a SENT row yet.
+     * Because FAILED rows do not count, failed students are retried on every
+     * scheduler run until they succeed (or the exam starts).
+     * Returns how many were sent successfully THIS run.
+     */
+    public int broadcastReminderSkippingSent(Long examId) {
+        Exam exam = getExam(examId);
+
+        int sentCount = 0;
+        for (User student : allStudents()) {
+
+            // Already got the email successfully? Then never send again.
+            boolean alreadySent = emailLogRepository
+                    .existsByExam_ExamIdAndUser_UserIdAndStatus(
+                            examId, student.getUserId(), EmailStatus.SENT);
+            if (alreadySent) {
+                continue;
+            }
+
+            if (sendOne(student, exam)) {
+                sentCount++;
+            }
+        }
+        return sentCount;
+    }
+
+    // ---------- shared helpers ----------
+
+    private Exam getExam(Long examId) {
+        return examRepository.findById(examId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Exam not found with id: " + examId));
+    }
+
+    /** Every STUDENT (admins don't take exams, so they're excluded). */
+    private List<User> allStudents() {
+        return userRepository.findAll().stream()
+                .filter(u -> u.getRole() == Role.STUDENT)
+                .toList();
+    }
+
+    /**
      * Send to one student and log the outcome. Returns true on success.
      * The try/catch is the whole point: a failure to email ONE student
-     * must not stop the loop or crash the request — we log FAILED and move on.
+     * must not stop the loop or crash the request - we log FAILED and move on.
      */
     private boolean sendOne(User student, Exam exam) {
         String when = exam.getScheduledAt()
@@ -78,6 +124,7 @@ public class EmailService {
             return true;
         } catch (Exception e) {
             // Sending failed (bad address, SMTP down...). Record it, keep going.
+            e.printStackTrace();
             saveLog(student, exam, EmailStatus.FAILED, null);
             return false;
         }

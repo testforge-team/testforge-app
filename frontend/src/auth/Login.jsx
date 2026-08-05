@@ -31,6 +31,7 @@ export default function Login() {
   const [email, setEmail] = useState('')        // what is typed in the email box
   const [password, setPassword] = useState('')  // what is typed in the password box
   const [error, setError] = useState('')        // the red message (empty = hidden)
+  const [showPassword, setShowPassword] = useState(false)
 
   // useNavigate gives us a function to jump to another page from code.
   const navigate = useNavigate()
@@ -65,9 +66,18 @@ export default function Login() {
 
         <form onSubmit={handleSubmit}>
           <input className="form-control mb-2" type="email" placeholder="Email"
-                 value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input className="form-control mb-3" type="password" placeholder="Password"
-                 value={password} onChange={(e) => setPassword(e.target.value)} required />
+            value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <div className="input-group mb-3">
+            <input className="form-control"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)} required />
+            <button className="btn btn-outline-secondary" type="button"
+              onClick={() => setShowPassword(!showPassword)}>
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+          </div>
           <button className="btn btn-primary w-100">Login</button>
         </form>
 
