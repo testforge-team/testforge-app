@@ -66,17 +66,20 @@ INSERT INTO topics (topic_id, topic_name, created_at) VALUES
 -- ---------- 3. EXAMS (10) ----------
 -- Exams 9 and 10 deliberately have NO questions mapped, so they
 -- stay hidden from students - this demonstrates the publishing rule.
-INSERT INTO exams (exam_id, title, duration_minutes, passing_marks, scheduled_at, created_by, created_at) VALUES
-  (1, 'Java Fundamentals Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '20 days', 1, CURRENT_TIMESTAMP - INTERVAL '38 days'),
-  (2, 'OOP and Collections Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '15 days', 1, CURRENT_TIMESTAMP - INTERVAL '36 days'),
-  (3, 'Core Java Assessment', 25, 3, CURRENT_TIMESTAMP - INTERVAL '12 days', 2, CURRENT_TIMESTAMP - INTERVAL '34 days'),
-  (4, 'SQL Basics Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '10 days', 1, CURRENT_TIMESTAMP - INTERVAL '32 days'),
-  (5, 'Advanced SQL Test', 25, 3, CURRENT_TIMESTAMP - INTERVAL '8 days', 2, CURRENT_TIMESTAMP - INTERVAL '30 days'),
-  (6, 'Spring Framework Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '5 days', 1, CURRENT_TIMESTAMP - INTERVAL '28 days'),
-  (7, 'Spring Boot and JPA Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '3 days', 2, CURRENT_TIMESTAMP - INTERVAL '26 days'),
-  (8, 'Full Stack Mock Test', 45, 4, CURRENT_TIMESTAMP + INTERVAL '24 hours', 1, CURRENT_TIMESTAMP - INTERVAL '24 days'),
-  (9, 'Web Technologies Quiz', 20, 2, CURRENT_TIMESTAMP + INTERVAL '5 days', 2, CURRENT_TIMESTAMP - INTERVAL '22 days'),
-  (10, 'Final Mock Test', 60, 5, CURRENT_TIMESTAMP + INTERVAL '10 days', 1, CURRENT_TIMESTAMP - INTERVAL '20 days');
+-- active_hours: how long the exam stays open after scheduled_at.
+-- Exam 8 opens in 24h with a 48h window, so it is upcoming AND will be ACTIVE
+-- long enough to demonstrate the reminder job and the status toggle.
+INSERT INTO exams (exam_id, title, duration_minutes, passing_marks, scheduled_at, active_hours, created_by, created_at) VALUES
+  (1, 'Java Fundamentals Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '20 days', 24, 1, CURRENT_TIMESTAMP - INTERVAL '38 days'),
+  (2, 'OOP and Collections Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '15 days', 24, 1, CURRENT_TIMESTAMP - INTERVAL '36 days'),
+  (3, 'Core Java Assessment', 25, 3, CURRENT_TIMESTAMP - INTERVAL '12 days', 24, 2, CURRENT_TIMESTAMP - INTERVAL '34 days'),
+  (4, 'SQL Basics Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '10 days', 24, 1, CURRENT_TIMESTAMP - INTERVAL '32 days'),
+  (5, 'Advanced SQL Test', 25, 3, CURRENT_TIMESTAMP - INTERVAL '8 days', 24, 2, CURRENT_TIMESTAMP - INTERVAL '30 days'),
+  (6, 'Spring Framework Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '5 days', 24, 1, CURRENT_TIMESTAMP - INTERVAL '28 days'),
+  (7, 'Spring Boot and JPA Test', 30, 3, CURRENT_TIMESTAMP - INTERVAL '3 days', 24, 2, CURRENT_TIMESTAMP - INTERVAL '26 days'),
+  (8, 'Full Stack Mock Test', 45, 4, CURRENT_TIMESTAMP + INTERVAL '24 hours', 48, 1, CURRENT_TIMESTAMP - INTERVAL '24 days'),
+  (9, 'Web Technologies Quiz', 20, 2, CURRENT_TIMESTAMP + INTERVAL '5 days', 24, 2, CURRENT_TIMESTAMP - INTERVAL '22 days'),
+  (10, 'Final Mock Test', 60, 5, CURRENT_TIMESTAMP + INTERVAL '10 days', 24, 1, CURRENT_TIMESTAMP - INTERVAL '20 days');
 
 -- ---------- 4. QUESTIONS (30) - three per topic ----------
 INSERT INTO questions (question_id, topic_id, question_text, option_a, option_b, option_c, option_d, correct_option, created_at) VALUES
@@ -160,17 +163,21 @@ INSERT INTO exam_questions (exam_id, question_id) VALUES
 -- ---------- 6. RESULTS (10) ----------
 -- Note results 1 and 10: the same student retook exam 1 and improved
 -- from 4 to 5 - a retake creates a NEW attempt, it does not overwrite.
-INSERT INTO results (result_id, user_id, exam_id, final_score, exam_date) VALUES
-  (1, 3, 1, 4, CURRENT_TIMESTAMP - INTERVAL '19 days'),
-  (2, 4, 1, 2, CURRENT_TIMESTAMP - INTERVAL '19 days'),
-  (3, 5, 1, 5, CURRENT_TIMESTAMP - INTERVAL '18 days'),
-  (4, 3, 4, 3, CURRENT_TIMESTAMP - INTERVAL '9 days'),
-  (5, 4, 4, 1, CURRENT_TIMESTAMP - INTERVAL '9 days'),
-  (6, 6, 4, 4, CURRENT_TIMESTAMP - INTERVAL '8 days'),
-  (7, 3, 6, 2, CURRENT_TIMESTAMP - INTERVAL '4 days'),
-  (8, 5, 6, 4, CURRENT_TIMESTAMP - INTERVAL '4 days'),
-  (9, 7, 2, 3, CURRENT_TIMESTAMP - INTERVAL '14 days'),
-  (10, 3, 1, 5, CURRENT_TIMESTAMP - INTERVAL '2 days');
+-- started_at, end_time and status describe the attempt lifecycle.
+-- All rows below are FINISHED attempts. Result 9 is AUTO_SUBMITTED (the timer
+-- ran out while the student was on the page) and result 5 is EXPIRED (the
+-- server closed it after the student left), so every status appears in the data.
+INSERT INTO results (result_id, user_id, exam_id, final_score, exam_date, started_at, end_time, status) VALUES
+  (1, 3, 1, 4, CURRENT_TIMESTAMP - INTERVAL '19 days', CURRENT_TIMESTAMP - INTERVAL '19 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '19 days', 'SUBMITTED'),
+  (2, 4, 1, 2, CURRENT_TIMESTAMP - INTERVAL '19 days', CURRENT_TIMESTAMP - INTERVAL '19 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '19 days', 'SUBMITTED'),
+  (3, 5, 1, 5, CURRENT_TIMESTAMP - INTERVAL '18 days', CURRENT_TIMESTAMP - INTERVAL '18 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '18 days', 'SUBMITTED'),
+  (4, 3, 4, 3, CURRENT_TIMESTAMP - INTERVAL '9 days', CURRENT_TIMESTAMP - INTERVAL '9 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '9 days', 'SUBMITTED'),
+  (5, 4, 4, 1, CURRENT_TIMESTAMP - INTERVAL '9 days', CURRENT_TIMESTAMP - INTERVAL '9 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '9 days', 'EXPIRED'),
+  (6, 6, 4, 4, CURRENT_TIMESTAMP - INTERVAL '8 days', CURRENT_TIMESTAMP - INTERVAL '8 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '8 days', 'SUBMITTED'),
+  (7, 3, 6, 2, CURRENT_TIMESTAMP - INTERVAL '4 days', CURRENT_TIMESTAMP - INTERVAL '4 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '4 days', 'SUBMITTED'),
+  (8, 5, 6, 4, CURRENT_TIMESTAMP - INTERVAL '4 days', CURRENT_TIMESTAMP - INTERVAL '4 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '4 days', 'SUBMITTED'),
+  (9, 7, 2, 3, CURRENT_TIMESTAMP - INTERVAL '14 days', CURRENT_TIMESTAMP - INTERVAL '14 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '14 days', 'AUTO_SUBMITTED'),
+  (10, 3, 1, 5, CURRENT_TIMESTAMP - INTERVAL '2 days', CURRENT_TIMESTAMP - INTERVAL '2 days' - INTERVAL '30 minutes', CURRENT_TIMESTAMP - INTERVAL '2 days', 'SUBMITTED');
 
 -- ---------- 7. STUDENT_ANSWERS (50) ----------
 -- One row per question of the exam, for every attempt.

@@ -1,6 +1,6 @@
 -- ============================================================
 -- TestForge : An Interactive Exam Portal Where Skills Are Forged
--- PostgreSQL DDL Script — 9 Tables (Final Locked Schema)
+-- PostgreSQL DDL Script — 9 Tables
 -- Run order respects foreign key dependencies.
 -- ============================================================
 
@@ -28,13 +28,18 @@ CREATE TABLE exams (
     title            VARCHAR(150) NOT NULL,
     duration_minutes INT          NOT NULL,
     passing_marks    INT          NOT NULL,      -- min score to PASS (1 mark/question)
-    scheduled_at     TIMESTAMP    NOT NULL,      -- drives 24-hr reminder job
+    scheduled_at     TIMESTAMP    NOT NULL,      -- when the exam OPENS; drives reminders
+    active_hours     INT          NOT NULL DEFAULT 24,  -- stays open this many hours
     created_by       INT          NOT NULL,
     created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_exams_creator   FOREIGN KEY (created_by) REFERENCES users(user_id),
     CONSTRAINT chk_exam_duration  CHECK (duration_minutes > 0),
-    CONSTRAINT chk_passing_marks  CHECK (passing_marks >= 0)
+    CONSTRAINT chk_passing_marks  CHECK (passing_marks >= 0),
+    CONSTRAINT chk_active_hours   CHECK (active_hours > 0)
 );
+-- The exam window is:  opens at scheduled_at, closes at scheduled_at + active_hours.
+-- Status (NOT_STARTED / ACTIVE / EXPIRED) is CALCULATED from these two columns,
+-- never stored, so it can never become stale.
 
 -- 4. QUESTIONS ------------------------------------------------
 CREATE TABLE questions (
@@ -65,12 +70,29 @@ CREATE TABLE results (
     result_id    SERIAL PRIMARY KEY,
     user_id      INT       NOT NULL,
     exam_id      INT       NOT NULL,
-    final_score  INT       NOT NULL,             -- count of correct answers
+    final_score  INT       NOT NULL DEFAULT 0,   -- count of correct answers
     exam_date    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- submission time
+    started_at   TIMESTAMP,                      -- when the student pressed Start
+    end_time     TIMESTAMP,                      -- server-decided deadline for THIS attempt
+    status       VARCHAR(20) NOT NULL DEFAULT 'SUBMITTED',
     CONSTRAINT fk_results_user  FOREIGN KEY (user_id) REFERENCES users(user_id),
     CONSTRAINT fk_results_exam  FOREIGN KEY (exam_id) REFERENCES exams(exam_id),
-    CONSTRAINT chk_final_score  CHECK (final_score >= 0)
+    CONSTRAINT chk_final_score  CHECK (final_score >= 0),
+    CONSTRAINT chk_result_status CHECK (status IN
+        ('IN_PROGRESS', 'SUBMITTED', 'AUTO_SUBMITTED', 'EXPIRED'))
 );
+-- A row is created the MOMENT the student presses Start (status IN_PROGRESS),
+-- not at submission. end_time is stored on the server, so the countdown shown in
+-- the browser is derived from it -- refreshing the page cannot reset or extend it.
+--
+-- A student may have only ONE unfinished attempt per exam. This partial unique
+-- index enforces that, while still allowing unlimited finished attempts (retakes).
+CREATE UNIQUE INDEX idx_one_active_attempt
+    ON results (user_id, exam_id)
+    WHERE status = 'IN_PROGRESS';
+
+-- Used by the background job that closes abandoned attempts.
+CREATE INDEX idx_results_status_endtime ON results (status, end_time);
 
 -- 7. STUDENT_ANSWERS ------------------------------------------
 CREATE TABLE student_answers (
@@ -83,6 +105,10 @@ CREATE TABLE student_answers (
     CONSTRAINT fk_sa_question  FOREIGN KEY (question_id) REFERENCES questions(question_id),
     CONSTRAINT chk_selected    CHECK (selected_option IN ('A', 'B', 'C', 'D') OR selected_option IS NULL)
 );
+-- Answers are now saved DURING the exam (auto-save on every click), so the same
+-- question must never get two rows in one attempt. Changing an answer UPDATES
+-- this row instead of inserting another.
+CREATE UNIQUE INDEX idx_answer_unique ON student_answers (result_id, question_id);
 
 -- 8. STUDENT_WEAKNESSES ---------------------------------------
 CREATE TABLE student_weaknesses (
