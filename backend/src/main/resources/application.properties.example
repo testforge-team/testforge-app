@@ -1,0 +1,24 @@
+# ===== Database =====
+spring.datasource.url=jdbc:postgresql://localhost:5432/testforge
+spring.datasource.username=postgres
+spring.datasource.password=YOUR_DB_PASSWORD
+
+# You created the tables with TestForge_schema.sql, so let Hibernate use them as-is.
+# 'none' avoids type-mismatch headaches (Java Long vs SERIAL). Switch to 'validate'
+# once your entities exactly match the columns.
+spring.jpa.hibernate.ddl-auto=none
+spring.jpa.show-sql=true
+
+# ===== JWT =====
+# Generate your own with:  openssl rand -base64 32
+app.jwt.secret=REPLACE_WITH_A_BASE64_SECRET_AT_LEAST_32_BYTES
+app.jwt.expiration-ms=86400000
+
+server.port=8080
+# ===== Email (Gmail SMTP) =====
+spring.mail.host=smtp.gmail.com
+spring.mail.port=587
+spring.mail.username=
+spring.mail.password=
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true

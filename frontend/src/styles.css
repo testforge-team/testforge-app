@@ -1,0 +1,23 @@
+/* Our own small CSS on top of Bootstrap.
+   This is normal CSS — nothing React-specific here. */
+body { background: #f6f7fb; }
+.card { border-radius: 10px; }
+
+/* Used later by Person C's exam screen */
+.timer-box {
+  font-size: 1.4rem; font-weight: 700; padding: 6px 18px;
+  border: 2px solid #333; border-radius: 8px; background: #fff;
+}
+.qnav-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;                /* kill Bootstrap's padding - this is the actual fix */
+  white-space: nowrap;       /* never break the number across lines */
+  display: inline-flex;      /* centre the number both ways */
+  align-items: center;
+  justify-content: center;
+}
+.qnav-answered { background:#d1e7dd !important; border-color:#0f5132 !important; }
+.qnav-current { outline: 3px solid #0d6efd; }
+.option-row { cursor: pointer; }
+.option-row:hover { background: #eef3ff; }
